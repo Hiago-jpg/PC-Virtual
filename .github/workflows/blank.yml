@@ -1,94 +1,19 @@
-name: PC Virtual
-
-on:
-  workflow_dispatch:
-    inputs:
-      senha:
-        description: "Senha do VNC (use até 8 caracteres)"
-        required: true
-        type: string
-
-jobs:
-  pc-virtual:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 360
-
-    steps:
-
       # =========================
-      # ATUALIZAR SISTEMA
+      # INSTALAR E CONFIGURAR NGROK
       # =========================
-      - name: Atualizar sistema
-        run: |
-          sudo apt update
-          sudo apt upgrade -y
-
-      # =========================
-      # INSTALAR DESKTOP + VNC
-      # =========================
-      - name: Instalar XFCE e VNC
-        run: |
-          sudo DEBIAN_FRONTEND=noninteractive apt install -y \
-            xfce4 \
-            xfce4-goodies \
-            tigervnc-standalone-server \
-            tigervnc-tools \
-            dbus-x11 \
-            xterm \
-            curl \
-            jq
-
-      # =========================
-      # CONFIGURAR VNC
-      # =========================
-      - name: Configurar VNC
+      - name: Instalar e configurar ngrok
         env:
-          VNC_PASSWORD: ${{ inputs.senha }}
+          NGROK_AUTHTOKEN: ${{ secrets.NGROK_AUTHTOKEN }}
         run: |
-          mkdir -p ~/.vnc
+          curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+            | sudo hkp-server --import 2>/dev/null || curl -sSL https://ngrok-agent.s3.amazonaws.com/ngrok.asc \
+            | sudo tee /etc/apt/trusted.gpg.d/ngrok.asc >/dev/null
+          
+          echo "deb https://ngrok-agent.s3.amazonaws.com buster main" \
+            | sudo tee /etc/apt/sources.list.d/ngrok.list
 
-          printf '%s\n' "$VNC_PASSWORD" | vncpasswd -f > ~/.vnc/passwd
-          chmod 600 ~/.vnc/passwd
-
-          cat > ~/.vnc/xstartup <<'EOF'
-          #!/bin/sh
-
-          unset SESSION_MANAGER
-          unset DBUS_SESSION_BUS_ADDRESS
-
-          export XDG_CURRENT_DESKTOP=XFCE
-          export XDG_CONFIG_DIRS=/etc/xdg/xdg-xfce:/etc/xdg:$XDG_CONFIG_DIRS
-          export XDG_DATA_DIRS=/usr/share/xfce4:/usr/local/share:/usr/share:$XDG_DATA_DIRS
-
-          dbus-launch --exit-with-session startxfce4
-          EOF
-
-          chmod +x ~/.vnc/xstartup
-
-      # =========================
-      # INICIAR SERVIDOR VNC
-      # =========================
-      - name: Iniciar PC virtual
-        run: |
-          vncserver :1 \
-            -geometry 1280x720 \
-            -depth 24 \
-            -localhost no
-
-          echo "======================================"
-          echo "PC VIRTUAL INICIADO"
-          echo "======================================"
-          echo "Porta VNC: 5901"
-          echo "Resolucao: 1280x720"
-          echo "======================================"
-
-      # =========================
-      # INSTALAR NGROK
-      # =========================
-      - name: Configurar ngrok
-        uses: ngrok/ngrok-action@v2
-        with:
-          auth-token: ${{ secrets.NGROK_AUTHTOKEN }}
+          sudo apt update && sudo apt install -y ngrok
+          ngrok config add-authtoken "$NGROK_AUTHTOKEN"
 
       # =========================
       # ABRIR TUNEL
@@ -121,14 +46,3 @@ jobs:
           echo "Use esse endereco no seu aplicativo VNC."
           echo ""
           echo "======================================"
-
-      # =========================
-      # MANTER A MAQUINA LIGADA
-      # =========================
-      - name: Manter PC funcionando
-        run: |
-          while true; do
-            echo "PC virtual funcionando..."
-            date
-            sleep 300
-          done
