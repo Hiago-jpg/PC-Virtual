@@ -86,7 +86,7 @@ jobs:
       # INSTALAR NGROK
       # =========================
       - name: Configurar ngrok
-        uses: ngrok/ngrok-action@v1
+        uses: ngrok/ngrok-action@v2
         with:
           auth-token: ${{ secrets.NGROK_AUTHTOKEN }}
 
